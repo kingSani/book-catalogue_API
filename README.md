@@ -1,0 +1,1 @@
+Mini Book Catalogue API is a simple backend web service built using Node.js, Express, and TypeScript. It provides a set of RESTful endpoints to perform full CRUD operations (Create, Read, Update, Delete) on a collection of books, featuring strict type checking, JSON request handling, and custom error validation.
