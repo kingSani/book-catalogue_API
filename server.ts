@@ -29,7 +29,7 @@ app.get("/books/:id", (req: Request, res: Response) => {
     res.status(404).json({ Error: "Book not found" });
   }
 });
-app.get("/books/author", (req: Request, res: Response) => {
+app.get("/books/authors/:author", (req: Request, res: Response) => {
   const authorName = req.params.author;
   const book = books.find((b) => b.author === authorName);
   if (book) {
@@ -39,7 +39,7 @@ app.get("/books/author", (req: Request, res: Response) => {
   }
 });
 app.post("/books", (req: Request, res: Response) => {
-  const bookId: number = books.length + 1;
+  const bookId: number = books.length - 1 + 1;
   if (
     typeof req.body.name !== "string" ||
     typeof req.body.author !== "string"
