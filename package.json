@@ -1,24 +1,28 @@
 {
-  "name": "Book Catalogue API",
+  "name": "book-catalogue-api",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A lightweight RESTful API built with Node.js, Express, and TypeScript.",
+  "main": "src/server.ts",
+  "type": "module",
   "scripts": {
-    "devStart": "nodemon server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "express",
+    "typescript",
+    "api",
+    "node"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "ejs": "^6.0.1",
     "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
-    "nodemon": "^3.1.14",
     "ts-node-dev": "^2.0.0",
     "typescript": "^7.0.2"
   }

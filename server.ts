@@ -39,7 +39,8 @@ app.get("/books/authors/:author", (req: Request, res: Response) => {
   }
 });
 app.post("/books", (req: Request, res: Response) => {
-  const bookId: number = books.length - 1 + 1;
+  const lastBook = books.length - 1;
+  const bookId: number = lastBook + 1;
   if (
     typeof req.body.name !== "string" ||
     typeof req.body.author !== "string"
@@ -69,17 +70,16 @@ app.put("/books/:id", (req: Request, res: Response) => {
     return;
   }
 
-  const book = books.find((b) => b.id === bookId);
-  if (book) {
+  const index = books.findIndex((b) => b.id === bookId);
+  if (index !== -1) {
     const updatedBook = {
-      ...book,
+      id: bookId,
       name: req.body.name,
       author: req.body.author,
     };
-    const updatedBooks = books.map((book) => {
-      bookId === book.id ? updatedBook : book;
-    });
-    res.status(200).json(updatedBooks);
+    books.splice(index, 1);
+    books.push(updatedBook)
+    res.status(200).json();
   } else {
     res.status(404).json({ Error: "Book not found" });
   }
