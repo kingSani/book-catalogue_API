@@ -1,7 +1,21 @@
+import dotenv from "dotenv";
+// Must be called before accessing process.env!
+dotenv.config();
 import type { Request, Response } from "express";
-const express = require("express");
+import express from "express";
+import pg from "pg";
+
+const { Pool } = pg;
+const pool = new Pool({
+  user: process.env.USER,
+  host: process.env.HOST,
+  database: process.env.DATABASE,
+  password: process.env.PASSWORD,
+  port: Number(process.env.PORT_DB),
+});
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 type Book = {
   name: string;
@@ -15,7 +29,14 @@ const books: Book[] = [
   { name: "Book 3", id: 3, author: "Author 3" },
 ];
 app.get("/books", (req: Request, res: Response) => {
-  res.status(200).json(books);
+  pool.query("SELECT * FROM Books", (err, result) => {
+    if (err) {
+      console.error("Error executing query:", err);
+      res.status(500).json({ Error: err.message, details: err });
+    } else {
+      res.status(200).json(result.rows);
+    }
+  });
 });
 app.get("/books/:id", (req: Request, res: Response) => {
   const bookId = Number(req.params.id);
@@ -78,7 +99,7 @@ app.put("/books/:id", (req: Request, res: Response) => {
       author: req.body.author,
     };
     books.splice(index, 1);
-    books.push(updatedBook)
+    books.push(updatedBook);
     res.status(200).json();
   } else {
     res.status(404).json({ Error: "Book not found" });
@@ -98,7 +119,7 @@ app.delete("/books/:id", (req: Request, res: Response) => {
     res.status(404).json({ Error: "Book not found" });
   }
 });
-app.use(express.urlencoded({ extended: true }));
+
 // const usersRouter = require("./routes/users");
 // app.use("/users", usersRouter);
 
@@ -108,4 +129,4 @@ app.use(express.urlencoded({ extended: true }));
 // }
 // app.use(logger);
 
-app.listen(3000);
+app.listen(process.env.PORT || 3000);
