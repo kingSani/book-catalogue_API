@@ -1,0 +1,23 @@
+# Environment variables (Prevents leaking DB passwords & keys)
+.env
+.env.local
+.env.*.local
+
+# Dependency directories
+node_modules/
+
+# Build and TypeScript outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs and debug files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

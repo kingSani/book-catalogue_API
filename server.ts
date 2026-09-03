@@ -44,11 +44,20 @@ app.get("/books/:id", (req: Request, res: Response) => {
     return res.status(400).json({ Error: "Invalid book ID" });
   }
   const book = books.find((b) => b.id === bookId);
-  if (book) {
-    res.status(200).json(book);
-  } else {
-    res.status(404).json({ Error: "Book not found" });
-  }
+  pool.query("SELECT * FROM Books WHERE id = $1", [bookId], (err, result) => {
+    if (err) {
+      res.status(500).json({ Error: err.message, details: err });
+    } else if (result.rows.length > 0 && book) {
+      res.status(200).json(result.rows[0]);
+    } else {
+      res.status(404).json({ Error: "Book not found" });
+    }
+  });
+  // if (book) {
+  //   res.status(200).json(book);
+  // } else {
+  //   res.status(404).json({ Error: "Book not found" });
+  // }
 });
 app.get("/books/authors/:author", (req: Request, res: Response) => {
   const authorName = req.params.author;
@@ -60,8 +69,6 @@ app.get("/books/authors/:author", (req: Request, res: Response) => {
   }
 });
 app.post("/books", (req: Request, res: Response) => {
-  const lastBook = books.length - 1;
-  const bookId: number = lastBook + 1;
   if (
     typeof req.body.name !== "string" ||
     typeof req.body.author !== "string"
@@ -70,13 +77,20 @@ app.post("/books", (req: Request, res: Response) => {
     return;
   }
   const bookName: string = req.body.name;
-  const newBook: Book = {
-    name: bookName,
-    id: bookId,
-    author: req.body.author,
-  };
-  books.push(newBook);
-  res.status(201).json(newBook);
+  const authorName: string = req.body.author;
+  pool.query(
+    "INSERT INTO Books (book_name, author) VALUES ($1, $2) RETURNING *",
+    [bookName, authorName],
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ Error: err.message, details: err });
+      } else {
+        const newBook: Book = result.rows[0];
+        res.status(201).json(newBook);
+      }
+    },
+  );
 });
 app.put("/books/:id", (req: Request, res: Response) => {
   const bookId = Number(req.params.id);
@@ -90,34 +104,53 @@ app.put("/books/:id", (req: Request, res: Response) => {
     res.status(400).json({ Error: "Invalid book data" });
     return;
   }
-
-  const index = books.findIndex((b) => b.id === bookId);
-  if (index !== -1) {
-    const updatedBook = {
-      id: bookId,
-      name: req.body.name,
-      author: req.body.author,
-    };
-    books.splice(index, 1);
-    books.push(updatedBook);
-    res.status(200).json();
-  } else {
-    res.status(404).json({ Error: "Book not found" });
-  }
+  const book = books.find((b) => b.id === bookId);
+  pool.query(
+    "UPDATE Books SET book_name = $1, author = $2 WHERE id = $3 RETURNING *",
+    [req.body.name, req.body.author, bookId],
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ Error: err.message, details: err });
+      } else if (book) {
+        const newBook: Book = result.rows[0];
+        res.status(201).json(newBook);
+      } else {
+        res.status(404).json({ Error: "Book not found" });
+      }
+    },
+  );
+  // const index = books.findIndex((b) => b.id === bookId);
+  // if (index !== -1) {
+  //   const updatedBook = {
+  //     id: bookId,
+  //     name: req.body.name,
+  //     author: req.body.author,
+  //   };
+  //   books.splice(index, 1);
+  //   books.push(updatedBook);
+  //   res.status(200).json();
+  // } else {
+  //   res.status(404).json({ Error: "Book not found" });
+  // }
 });
 app.delete("/books/:id", (req: Request, res: Response) => {
   const bookId = Number(req.params.id);
   if (isNaN(bookId)) {
     return res.status(400).json({ Error: "Invalid book ID" });
   }
-
-  const index = books.findIndex((b) => b.id === bookId);
-  if (index !== -1) {
-    books.splice(index, 1);
-    res.status(204).send();
-  } else {
-    res.status(404).json({ Error: "Book not found" });
-  }
+  
+  pool.query("DELETE FROM Books WHERE id = $1", [bookId], (err, result) => {
+    if (err) {
+      res.status(500).json({ Error: err.message, details: err });
+    } else if (result.rows.length > 0) {
+      res.status(200).json(result.rows[0]);
+    } else {
+      res.status(404).json({ Error: "Book not found" });
+    }
+  });
+  
+  
 });
 
 // const usersRouter = require("./routes/users");
