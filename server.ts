@@ -53,20 +53,23 @@ app.get("/books/:id", (req: Request, res: Response) => {
       res.status(404).json({ Error: "Book not found" });
     }
   });
-  // if (book) {
-  //   res.status(200).json(book);
-  // } else {
-  //   res.status(404).json({ Error: "Book not found" });
-  // }
 });
 app.get("/books/authors/:author", (req: Request, res: Response) => {
   const authorName = req.params.author;
   const book = books.find((b) => b.author === authorName);
-  if (book) {
-    res.status(200).json(book);
-  } else {
-    res.status(404).json({ Error: "Book not found" });
-  }
+  pool.query(
+    "SELECT * FROM Books WHERE author ILIKE $1",
+    [`%${authorName}%`],
+    (err, result) => {
+      if (err) {
+        res.status(500).json({ Error: err.message, details: err });
+      } else if (result.rows.length > 0 && book) {
+        res.status(200).json(result.rows[0]);
+      } else {
+        res.status(404).json({ Error: "Book not found" });
+      }
+    },
+  );
 });
 app.post("/books", (req: Request, res: Response) => {
   if (
@@ -120,26 +123,13 @@ app.put("/books/:id", (req: Request, res: Response) => {
       }
     },
   );
-  // const index = books.findIndex((b) => b.id === bookId);
-  // if (index !== -1) {
-  //   const updatedBook = {
-  //     id: bookId,
-  //     name: req.body.name,
-  //     author: req.body.author,
-  //   };
-  //   books.splice(index, 1);
-  //   books.push(updatedBook);
-  //   res.status(200).json();
-  // } else {
-  //   res.status(404).json({ Error: "Book not found" });
-  // }
 });
 app.delete("/books/:id", (req: Request, res: Response) => {
   const bookId = Number(req.params.id);
   if (isNaN(bookId)) {
     return res.status(400).json({ Error: "Invalid book ID" });
   }
-  
+
   pool.query("DELETE FROM Books WHERE id = $1", [bookId], (err, result) => {
     if (err) {
       res.status(500).json({ Error: err.message, details: err });
@@ -149,8 +139,6 @@ app.delete("/books/:id", (req: Request, res: Response) => {
       res.status(404).json({ Error: "Book not found" });
     }
   });
-  
-  
 });
 
 // const usersRouter = require("./routes/users");
