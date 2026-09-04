@@ -25,6 +25,7 @@ type Book = {
 type Author = {
   author_name: string;
   id: number;
+  best_seller: boolean;
 };
 
 app.get("/books", (req: Request, res: Response) => {
@@ -96,16 +97,15 @@ app.get("/authors", (req: Request, res: Response) => {
   );
 });
 app.post("/authors", (req: Request, res: Response) => {
-  if (typeof req.body.name !== "string" || typeof req.body.id !== "number") {
+  if (typeof req.body.name !== "string") {
     res.status(400).json({ Error: "Invalid author data" });
     return;
   }
   const authorName: string = req.body.name;
-  const author_id: Number = req.body.id;
 
   pool.query(
-    "INSERT INTO Authors (author_name, author_id) VALUES ($1, $2) RETURNING *",
-    [authorName, author_id],
+    "INSERT INTO Authors (author_name, best_seller) VALUES ($1, $2) RETURNING *",
+    [authorName, req.body.best_seller],
     (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
@@ -126,11 +126,11 @@ app.post("/books", (req: Request, res: Response) => {
     return;
   }
   const bookName: string = req.body.name;
-  const author_id: Number = req.body.author_id;
-  const pages: Number = req.body.pages;
+  const authorId: number = req.body.author_id;
+  const pages: number = req.body.pages;
   pool.query(
     "INSERT INTO Books (book_name, author_id, pages) VALUES ($1, $2, $3) RETURNING *",
-    [bookName, author_id, pages],
+    [bookName, authorId, pages],
     (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
