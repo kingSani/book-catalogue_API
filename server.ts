@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-// Must be called before accessing process.env!
 dotenv.config();
 import type { Request, Response } from "express";
 import express from "express";
@@ -23,47 +22,32 @@ type Book = {
   author: string;
 };
 
-const books: Book[] = [
-  { name: "Book 1", id: 1, author: "Author 1" },
-  { name: "Book 2", id: 2, author: "Author 2" },
-  { name: "Book 3", id: 3, author: "Author 3" },
-];
 app.get("/books", (req: Request, res: Response) => {
-  pool.query("SELECT * FROM Books", (err, result) => {
-    if (err) {
-      console.error("Error executing query:", err);
-      res.status(500).json({ Error: err.message, details: err });
-    } else {
-      res.status(200).json(result.rows);
-    }
-  });
+  pool.query(
+    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = book_owner",
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else {
+        res.status(200).json(result.rows);
+      }
+    },
+  );
 });
 app.get("/books/:id", (req: Request, res: Response) => {
   const bookId = Number(req.params.id);
   if (isNaN(bookId)) {
     return res.status(400).json({ Error: "Invalid book ID" });
   }
-  const book = books.find((b) => b.id === bookId);
-  pool.query("SELECT * FROM Books WHERE id = $1", [bookId], (err, result) => {
-    if (err) {
-      res.status(500).json({ Error: err.message, details: err });
-    } else if (result.rows.length > 0 && book) {
-      res.status(200).json(result.rows[0]);
-    } else {
-      res.status(404).json({ Error: "Book not found" });
-    }
-  });
-});
-app.get("/books/authors/:author", (req: Request, res: Response) => {
-  const authorName = req.params.author;
-  const book = books.find((b) => b.author === authorName);
+
   pool.query(
-    "SELECT * FROM Books WHERE author ILIKE $1",
-    [`%${authorName}%`],
+    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = book_owner WHERE id = $1",
+    [bookId],
     (err, result) => {
       if (err) {
-        res.status(500).json({ Error: err.message, details: err });
-      } else if (result.rows.length > 0 && book) {
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else if (result.rows.length > 0) {
         res.status(200).json(result.rows[0]);
       } else {
         res.status(404).json({ Error: "Book not found" });
@@ -71,23 +55,59 @@ app.get("/books/authors/:author", (req: Request, res: Response) => {
     },
   );
 });
+app.get("/authors/:id", (req: Request, res: Response) => {
+  const authorId = Number(req.params.id);
+  if (isNaN(authorId)) {
+    return res.status(400).json({ Error: "Invalid author ID" });
+  }
+
+  pool.query(
+    "SELECT * FROM Authors WHERE author_id = $1",
+    [authorId],
+    (err, result) => {
+      if (err) {
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else if (result.rows.length > 0) {
+        res.status(200).json(result.rows[0]);
+      } else {
+        res.status(404).json({ Error: "Author not found" });
+      }
+    },
+  );
+});
+app.get("/authors", (req: Request, res: Response) => {
+  pool.query(
+    "SELECT * FROM Authors",
+
+    (err, result) => {
+      if (err) {
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else if (result.rows.length > 0) {
+        res.status(200).json(result.rows);
+      } else {
+        res.status(404).json({ Error: "Author not found" });
+      }
+    },
+  );
+});
 app.post("/books", (req: Request, res: Response) => {
   if (
     typeof req.body.name !== "string" ||
-    typeof req.body.author !== "string"
+    typeof req.body.author_id !== "number"
   ) {
     res.status(400).json({ Error: "Invalid book data" });
     return;
   }
   const bookName: string = req.body.name;
-  const authorName: string = req.body.author;
+  const author_id: Number = req.body.author_id;
+  const pages: Number = req.body.pages;
   pool.query(
-    "INSERT INTO Books (book_name, author) VALUES ($1, $2) RETURNING *",
-    [bookName, authorName],
+    "INSERT INTO Books (book_name, author_id, pages) VALUES ($1, $2, $3) RETURNING *",
+    [bookName, author_id, pages],
     (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
-        res.status(500).json({ Error: err.message, details: err });
+        res.status(500).json({ Error: "Internal Server Error" });
       } else {
         const newBook: Book = result.rows[0];
         res.status(201).json(newBook);
@@ -102,20 +122,21 @@ app.put("/books/:id", (req: Request, res: Response) => {
   }
   if (
     typeof req.body.name !== "string" ||
-    typeof req.body.author !== "string"
+    typeof req.body.author_id !== "number" ||
+    typeof req.body.pages !== "number"
   ) {
     res.status(400).json({ Error: "Invalid book data" });
     return;
   }
-  const book = books.find((b) => b.id === bookId);
+
   pool.query(
-    "UPDATE Books SET book_name = $1, author = $2 WHERE id = $3 RETURNING *",
-    [req.body.name, req.body.author, bookId],
+    "UPDATE Books SET book_name = $1, author_id = $2 WHERE id = $3 RETURNING *",
+    [req.body.name, req.body.author_id, bookId],
     (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
-        res.status(500).json({ Error: err.message, details: err });
-      } else if (book) {
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else if (result.rows.length > 0) {
         const newBook: Book = result.rows[0];
         res.status(201).json(newBook);
       } else {
@@ -130,24 +151,19 @@ app.delete("/books/:id", (req: Request, res: Response) => {
     return res.status(400).json({ Error: "Invalid book ID" });
   }
 
-  pool.query("DELETE FROM Books WHERE id = $1", [bookId], (err, result) => {
-    if (err) {
-      res.status(500).json({ Error: err.message, details: err });
-    } else if (result.rows.length > 0) {
-      res.status(200).json(result.rows[0]);
-    } else {
-      res.status(404).json({ Error: "Book not found" });
-    }
-  });
+  pool.query(
+    "DELETE FROM Books WHERE id = $1 RETURNING *",
+    [bookId],
+    (err, result) => {
+      if (err) {
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else if (result.rows.length > 0) {
+        res.status(200).json(result.rows[0]);
+      } else {
+        res.status(404).json({ Error: "Book not found" });
+      }
+    },
+  );
 });
-
-// const usersRouter = require("./routes/users");
-// app.use("/users", usersRouter);
-
-// function logger(req, res, next) {
-//   console.log(req.originalUrl);
-//   next();
-// }
-// app.use(logger);
 
 app.listen(process.env.PORT || 3000);
