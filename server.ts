@@ -17,14 +17,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 type Book = {
-  name: string;
+  book_name: string;
   id: number;
-  author: string;
+  author_id: number;
+  pages: number;
+};
+type Author = {
+  author_name: string;
+  id: number;
 };
 
 app.get("/books", (req: Request, res: Response) => {
   pool.query(
-    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = book_owner",
+    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = Authors.id",
     (err, result) => {
       if (err) {
         console.error("Error executing query:", err);
@@ -42,7 +47,7 @@ app.get("/books/:id", (req: Request, res: Response) => {
   }
 
   pool.query(
-    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = book_owner WHERE id = $1",
+    "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = Authors.id WHERE Books.id = $1",
     [bookId],
     (err, result) => {
       if (err) {
@@ -62,7 +67,7 @@ app.get("/authors/:id", (req: Request, res: Response) => {
   }
 
   pool.query(
-    "SELECT * FROM Authors WHERE author_id = $1",
+    "SELECT * FROM Authors WHERE id = $1",
     [authorId],
     (err, result) => {
       if (err) {
@@ -86,6 +91,28 @@ app.get("/authors", (req: Request, res: Response) => {
         res.status(200).json(result.rows);
       } else {
         res.status(404).json({ Error: "Author not found" });
+      }
+    },
+  );
+});
+app.post("/authors", (req: Request, res: Response) => {
+  if (typeof req.body.name !== "string" || typeof req.body.id !== "number") {
+    res.status(400).json({ Error: "Invalid author data" });
+    return;
+  }
+  const authorName: string = req.body.name;
+  const author_id: Number = req.body.id;
+
+  pool.query(
+    "INSERT INTO Authors (author_name, author_id) VALUES ($1, $2) RETURNING *",
+    [authorName, author_id],
+    (err, result) => {
+      if (err) {
+        console.error("Error executing query:", err);
+        res.status(500).json({ Error: "Internal Server Error" });
+      } else {
+        const newAuthor: Author = result.rows[0];
+        res.status(201).json(newAuthor);
       }
     },
   );
