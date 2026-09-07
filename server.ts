@@ -30,21 +30,43 @@ type Author = {
 // TRANSACTION API
 app.post("/transfer", async (req: Request, res: Response) => {
   const client = await pool.connect();
+  if (
+    !req.body.id ||
+    !req.body.target_id ||
+    !req.body.amount ||
+    typeof req.body.amount !== "number" ||
+    req.body.amount <= 0 ||
+    typeof req.body.id !== "number" ||
+    typeof req.body.target_id !== "number" ||
+    req.body.id === req.body.target_id
+  ) {
+    res.status(400).json({ message: "Missing required fields" });
+    client.release();
+    return;
+  }
   try {
     await client.query("BEGIN");
     await client.query("SELECT id FROM accounts WHERE id IN (1,2) FOR UPDATE");
     await client.query(
-      "UPDATE accounts SET balance = balance +$1::numeric WHERE id = 1",
-      [req.body.amount],
+      "UPDATE accounts SET balance = balance -$1::numeric WHERE id = $2",
+      [req.body.amount, req.body.id],
     );
     await client.query(
-      "UPDATE accounts SET balance = balance -$1::numeric WHERE id = 2",
-      [req.body.amount],
+      "UPDATE accounts SET balance = balance +$1::numeric WHERE id = $2",
+      [req.body.amount, req.body.target_id],
     );
     await client.query("COMMIT");
     res.status(200).json({ message: "Transaction completed successfully" });
   } catch (err) {
     await client.query("ROLLBACK");
+    if (err && typeof err === "object" && "code" in err) {
+      if (err.code === "23514") {
+        return res.status(400).json({
+          error: "Validation failed",
+          message: `The data provided violates the database constraint: "${err.constraint}"`,
+        });
+      }
+    }
     res.status(500).json({ message: "Transaction failed", error: err });
     console.error("Error occurred while starting transaction:", err);
   } finally {
