@@ -15,7 +15,7 @@ const pool = new Pool({
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.set("view engine", "ejs");
+
 type Book = {
   book_name: string;
   id: number;
@@ -27,7 +27,32 @@ type Author = {
   id: number;
   best_seller: boolean;
 };
+// TRANSACTION API
+app.post("/transfer", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT id FROM accounts WHERE id IN (1,2) FOR UPDATE");
+    await client.query(
+      "UPDATE accounts SET balance = balance +$1::numeric WHERE id = 1",
+      [req.body.amount],
+    );
+    await client.query(
+      "UPDATE accounts SET balance = balance -$1::numeric WHERE id = 2",
+      [req.body.amount],
+    );
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Transaction completed successfully" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    res.status(500).json({ message: "Transaction failed", error: err });
+    console.error("Error occurred while starting transaction:", err);
+  } finally {
+    client.release();
+  }
+});
 
+//BOOKS AND AUTHORS API
 app.get("/books", (req: Request, res: Response) => {
   pool.query(
     "SELECT * FROM Books LEFT JOIN Authors ON Books.author_id = Authors.id",

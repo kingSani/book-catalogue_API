@@ -1,65 +1,42 @@
-type Address = {
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-};
-type Person = {
-  name: string;
-  age: number;
-  isStudent: boolean;
-  address?: Address;
-};
+import dotenv from "dotenv";
+dotenv.config();
+import type { Request, Response } from "express";
+import express from "express";
+import pg from "pg";
 
-let people: Person[] = [
-  {
-    name: "Alice",
-    age: 30,
-    isStudent: false,
-    address: {
-      street: "123 Main St",
-      city: "Anytown",
-      state: "CA",
-      zipCode: "12345",
-    },
-  },
-];
-type Order = {
-  id: number;
-  status: string;
-  food: Food;
-};
-type Food = {
-  name: string;
-  price: number;
-};
+const { Pool } = pg;
+const pool = new Pool({
+  user: process.env.USER,
+  host: process.env.HOST,
+  database: process.env.DATABASE,
+  password: process.env.PASSWORD,
+  port: Number(process.env.PORT_DB),
+});
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const menu = [
-  { name: "Pizza", price: 12.99 },
-  { name: "Burger", price: 8.99 },
-  { name: "Salad", price: 6.99 },
-];
-
-let cashInRegister: number = 100.0;
-const orderQueue = [];
-let nextOrderId: number = 1;
-
-function addNewFood(food: Food) {
-  menu.push(food);
-}
-
-function placeOrder(foodName: string) {
-  const food = menu.find((food) => food.name === foodName);
-  if (food) {
-    cashInRegister += food.price;
-    console.log(
-      `Order placed for ${food.name}. Total cash in register: $${cashInRegister.toFixed(2)}`,
+app.post("/transfer", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT * FROM accounts WHERE id = $1 FOR UPDATE", [
+      req.body.id,
+    ]);
+    await client.query(
+      "UPDATE accounts SET balance = balance +$2 WHERE id = $1",
+      [req.body.id, req.body.amount],
     );
-    const newOrder: Order = { id: nextOrderId++, status: "ordered", food };
-    orderQueue.push(newOrder);
+    await client.query(
+      "UPDATE accounts SET balance = balance -$2 WHERE id = 2",
+      [req.body.amount],
+    );
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Error occurred while starting transaction:", err);
+  } finally {
+    client.release();
+    res.status(200).json({ message: "Transaction completed successfully" });
   }
-}
-
-addNewFood({ name: "Pasta", price: 10.99 });
-addNewFood({ name: "Sushi", price: 14.99 });
-addNewFood({ name: "Taco", price: 5.99 });
+});
