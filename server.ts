@@ -57,16 +57,16 @@ app.post("/transfer", async (req: Request, res: Response) => {
     );
     await client.query("COMMIT");
     res.status(200).json({ message: "Transaction completed successfully" });
-  } catch (err) {
+  } catch (err: unknown) {
     await client.query("ROLLBACK");
-    if (err && typeof err === "object" && "code" in err) {
-      if (err.code === "23514") {
-        return res.status(400).json({
-          error: "Validation failed",
-          message: `The data provided violates the database constraint: "${err.constraint}"`,
-        });
-      }
+
+    if (dbError.code === "23514") {
+      return res.status(400).json({
+        error: "Validation failed",
+        message: `The data provided violates the database constraint: "${err.constraint}"`,
+      });
     }
+
     res.status(500).json({ message: "Transaction failed", error: err });
     console.error("Error occurred while starting transaction:", err);
   } finally {
@@ -212,7 +212,7 @@ app.put("/books/:id", (req: Request, res: Response) => {
         res.status(500).json({ Error: "Internal Server Error" });
       } else if (result.rows.length > 0) {
         const newBook: Book = result.rows[0];
-        res.status(201).json(newBook);
+        res.status(200).json(newBook);
       } else {
         res.status(404).json({ Error: "Book not found" });
       }
