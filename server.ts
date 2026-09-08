@@ -46,9 +46,12 @@ app.post("/transfer", async (req: Request, res: Response) => {
   }
   try {
     await client.query("BEGIN");
-    await client.query("SELECT id FROM accounts WHERE id IN ($1, $2) FOR UPDATE", [req.body.id, req.body.target_id]);
     await client.query(
-      "UPDATE accounts SET balance = balance -$1::numeric WHERE id = $2",
+      "SELECT id FROM accounts WHERE id IN ($1, $2) FOR UPDATE",
+      [req.body.id, req.body.target_id],
+    );
+    await client.query(
+      "UPDATE accounts SET balance = balance - $1::numeric WHERE id = $2",
       [req.body.amount, req.body.id],
     );
     await client.query(
@@ -60,7 +63,12 @@ app.post("/transfer", async (req: Request, res: Response) => {
   } catch (err) {
     await client.query("ROLLBACK");
 
-    if (err && typeof err === "object" && "code" in err && "constraint" in err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      "constraint" in err
+    ) {
       if (err.code === "23514") {
         return res.status(400).json({
           error: "Validation failed",
@@ -68,7 +76,6 @@ app.post("/transfer", async (req: Request, res: Response) => {
         });
       }
     }
-    
 
     res.status(500).json({ message: "Transaction failed", error: err });
     console.error("Error occurred while starting transaction:", err);
