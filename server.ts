@@ -82,7 +82,12 @@ app.delete("/notes/:id", async (req: Request, res: Response) => {
 });
 app.get("/notes/:id", async (req: Request, res: Response) => {
   const client = await pool.connect();
-  if (!req.body.user_id || !req.params.id || isNaN(Number(req.params.id))) {
+  if (
+    !req.body.user_id ||
+    !req.params.id ||
+    isNaN(Number(req.params.id)) ||
+    typeof req.body.user_id !== "number"
+  ) {
     // CHECKS WHETHER THE USER ID AND NOTE ID ARE PRESENT IN THE REQUEST BODY AND PARAMS
     res.status(400).json({ message: "Missing required fields" });
     client.release();
