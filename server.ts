@@ -27,18 +27,118 @@ type Author = {
   id: number;
   best_seller: boolean;
 };
+//NOTES API
+app.post("/notes", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  if (!req.body.title || !req.body.content || !req.body.user_id) {
+    res.status(400).json({ message: "Missing required fields" });
+    client.release();
+    return;
+  }
+  try {
+    await client.query(
+      "INSERT INTO notes (title,content, user_id) VALUES ($1,$2, $3)",
+      [req.body.title, req.body.content, req.body.user_id],
+    );
+    res.status(200).json({ message: "Note created successfully" });
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && "message" in err) {
+      res.status(500).json({ Error: err.message, details: err });
+    }
+  } finally {
+    client.release();
+  }
+});
+app.delete("/notes/:id", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  if (
+    !req.body.user_id ||
+    !req.params.id ||
+    isNaN(Number(req.params.id)) ||
+    typeof req.body.user_id !== "number"
+  ) {
+    // CHECKS WHETHER THE USER ID AND NOTE ID ARE PRESENT IN THE REQUEST BODY AND PARAMS
+    res.status(400).json({ message: "Missing required fields" });
+    client.release();
+    return;
+  }
+  try {
+    const result = await client.query(
+      "DELETE FROM notes WHERE user_id =$1 AND id =$2 ",
+      [req.body.user_id, req.params.id],
+    );
+    if (result.rowCount != null && result.rowCount > 0) {
+      res.status(204).send();
+    } else {
+      res.status(404).json({ message: "Note not found" });
+    }
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && "message" in err) {
+      res.status(500).json({ Error: err.message, details: err });
+    }
+  } finally {
+    client.release();
+  }
+});
+app.get("/notes/:id", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  if (!req.body.user_id || !req.params.id || isNaN(Number(req.params.id))) {
+    // CHECKS WHETHER THE USER ID AND NOTE ID ARE PRESENT IN THE REQUEST BODY AND PARAMS
+    res.status(400).json({ message: "Missing required fields" });
+    client.release();
+    return;
+  }
+  try {
+    const result = await client.query(
+      "SELECT * FROM notes WHERE user_id =$1 AND id =$2",
+      [req.body.user_id, req.params.id],
+    );
+    if (result.rows.length !== 0) {
+      res.status(200).json(result.rows);
+    } else {
+      res.status(404).json({ message: "Note not found" });
+    }
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && "message" in err) {
+      res.status(500).json({ Error: err.message, details: err });
+    }
+  } finally {
+    client.release();
+  }
+});
+app.get("/notes", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  if (!req.body.user_id) {
+    res.status(400).json({ message: "Missing required fields" });
+    client.release();
+    return;
+  }
+  try {
+    const result = await client.query("SELECT * FROM notes WHERE user_id =$1", [
+      req.body.user_id,
+    ]);
+    res.status(201).json(result.rows);
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && "message" in err) {
+      res.status(500).json({ Error: err.message, details: err });
+    }
+  } finally {
+    client.release();
+  }
+});
+
 // TRANSACTION API
 app.post("/transfer", async (req: Request, res: Response) => {
   const client = await pool.connect();
   if (
-    !req.body.id ||
-    !req.body.target_id ||
-    !req.body.amount ||
-    typeof req.body.amount !== "number" ||
-    req.body.amount <= 0 ||
-    typeof req.body.id !== "number" ||
-    typeof req.body.target_id !== "number" ||
-    req.body.id === req.body.target_id
+    !req.body.id || // CHECKS WHETHER THE ID IS PRESENT IN THE REQUEST BODY
+    !req.body.target_id || // CHECKS WHETHER THE TARGET ID IS PRESENT IN THE REQUEST BODY
+    !req.body.amount || // CHECKS WHETHER THE AMOUNT IS PRESENT IN THE REQUEST BODY
+    typeof req.body.amount !== "number" || // CHECKS WHETHER THE AMOUNT IS A NUMBER
+    req.body.amount <= 0 || // CHECKS WHETHER THE AMOUNT IS GREATER THAN 0
+    typeof req.body.id !== "number" || // CHECKS WHETHER THE ID IS A NUMBER
+    typeof req.body.target_id !== "number" || // CHECKS WHETHER THE TARGET ID IS A NUMBER
+    req.body.id === req.body.target_id // CHECKS WHETHER THE ID AND TARGET ID ARE THE SAME
   ) {
     res.status(400).json({ message: "Missing required fields" });
     client.release();
@@ -59,7 +159,7 @@ app.post("/transfer", async (req: Request, res: Response) => {
       [req.body.amount, req.body.target_id],
     );
     await client.query("COMMIT");
-    res.status(200).json({ message: "Transaction completed successfully" });
+    res.status(201).json({ message: "Transaction completed successfully" });
   } catch (err) {
     await client.query("ROLLBACK");
 
